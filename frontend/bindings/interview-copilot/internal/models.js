@@ -98,6 +98,36 @@ export class Settings {
              */
             this["sttProvider"] = "";
         }
+        if (!("sttLocalModel" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["sttLocalModel"] = "";
+        }
+        if (!("sttMirrorSource" in $$source)) {
+            /**
+             * "hf-mirror", "huggingface", "custom"
+             * @member
+             * @type {string}
+             */
+            this["sttMirrorSource"] = "";
+        }
+        if (!("sttCustomMirrorUrl" in $$source)) {
+            /**
+             * custom mirror url
+             * @member
+             * @type {string}
+             */
+            this["sttCustomMirrorUrl"] = "";
+        }
+        if (!("sttWhisperPath" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["sttWhisperPath"] = "";
+        }
         if (!("sttKey" in $$source)) {
             /**
              * @member
@@ -293,6 +323,228 @@ export class Turn {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new Turn(/** @type {Partial<Turn>} */($$parsedSource));
+    }
+}
+
+export class WhisperDownloadState {
+    /**
+     * Creates a new WhisperDownloadState instance.
+     * @param {Partial<WhisperDownloadState>} [$$source = {}] - The source object to create the WhisperDownloadState.
+     */
+    constructor($$source = {}) {
+        if (!("model" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["model"] = "";
+        }
+        if (!("status" in $$source)) {
+            /**
+             * "idle", "downloading", "completed", "failed", "cancelled"
+             * @member
+             * @type {string}
+             */
+            this["status"] = "";
+        }
+        if (!("downloaded" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["downloaded"] = 0;
+        }
+        if (!("total" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["total"] = 0;
+        }
+        if (!("progress" in $$source)) {
+            /**
+             * 0.0 - 100.0
+             * @member
+             * @type {number}
+             */
+            this["progress"] = 0;
+        }
+        if (!("speed" in $$source)) {
+            /**
+             * e.g. "4.5 MB/s"
+             * @member
+             * @type {string}
+             */
+            this["speed"] = "";
+        }
+        if (!("error" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["error"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WhisperDownloadState instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {WhisperDownloadState}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WhisperDownloadState(/** @type {Partial<WhisperDownloadState>} */($$parsedSource));
+    }
+}
+
+export class WhisperModelInfo {
+    /**
+     * Creates a new WhisperModelInfo instance.
+     * @param {Partial<WhisperModelInfo>} [$$source = {}] - The source object to create the WhisperModelInfo.
+     */
+    constructor($$source = {}) {
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (!("displayName" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["displayName"] = "";
+        }
+        if (!("filename" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["filename"] = "";
+        }
+        if (!("sizeBytes" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["sizeBytes"] = 0;
+        }
+        if (!("size" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["size"] = "";
+        }
+        if (!("englishOnly" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["englishOnly"] = false;
+        }
+        if (!("speed" in $$source)) {
+            /**
+             * 1-5
+             * @member
+             * @type {number}
+             */
+            this["speed"] = 0;
+        }
+        if (!("accuracy" in $$source)) {
+            /**
+             * 1-5
+             * @member
+             * @type {number}
+             */
+            this["accuracy"] = 0;
+        }
+        if (!("description" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["description"] = "";
+        }
+        if (!("recommendation" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["recommendation"] = "";
+        }
+        if (!("downloaded" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["downloaded"] = false;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WhisperModelInfo instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {WhisperModelInfo}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WhisperModelInfo(/** @type {Partial<WhisperModelInfo>} */($$parsedSource));
+    }
+}
+
+export class WhisperRuntimeStatus {
+    /**
+     * Creates a new WhisperRuntimeStatus instance.
+     * @param {Partial<WhisperRuntimeStatus>} [$$source = {}] - The source object to create the WhisperRuntimeStatus.
+     */
+    constructor($$source = {}) {
+        if (!("available" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["available"] = false;
+        }
+        if (!("path" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["path"] = "";
+        }
+        if (!("version" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["version"] = "";
+        }
+        if (!("error" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["error"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new WhisperRuntimeStatus instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {WhisperRuntimeStatus}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new WhisperRuntimeStatus(/** @type {Partial<WhisperRuntimeStatus>} */($$parsedSource));
     }
 }
 

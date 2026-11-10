@@ -2,6 +2,10 @@
 
 package internal
 
+import "os/exec"
+
+func HideWindow(cmd *exec.Cmd) {}
+
 func SetWindowProtection(hwnd uintptr, enable bool) bool {
 	return false
 }

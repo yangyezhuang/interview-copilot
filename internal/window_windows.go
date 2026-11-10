@@ -3,11 +3,17 @@
 package internal
 
 import (
+	"os/exec"
 	"runtime"
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
+
+func HideWindow(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+}
 
 var (
 	user32                       = windows.NewLazySystemDLL("user32.dll")

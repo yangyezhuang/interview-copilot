@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.0.0",
-    "@wailsio/runtime": "latest",
+    "@wailsio/runtime": "3.0.0-alpha.36",
     "vite": "^5.0.0"
   }
 }

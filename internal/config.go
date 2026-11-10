@@ -19,8 +19,12 @@ type Settings struct {
 	ApiKeys          map[string]string    `json:"apiKeys"`
 	Models           map[string]ModelPair `json:"models"`
 	Smart            bool                 `json:"smart"`
-	SttProvider      string               `json:"sttProvider"`
-	SttKey           string               `json:"sttKey"`
+	SttProvider        string               `json:"sttProvider"`
+	SttLocalModel      string               `json:"sttLocalModel"`
+	SttMirrorSource    string               `json:"sttMirrorSource"`    // "hf-mirror", "huggingface", "custom"
+	SttCustomMirrorUrl string               `json:"sttCustomMirrorUrl"` // custom mirror url
+	SttWhisperPath     string               `json:"sttWhisperPath"`
+	SttKey             string               `json:"sttKey"`
 	SttBaseUrl       string               `json:"sttBaseUrl"`
 	SttModel         string               `json:"sttModel"`
 	SttLanguage      string               `json:"sttLanguage"`
@@ -124,8 +128,12 @@ func DefaultSettings() Settings {
 				Smart: "default",
 			},
 		},
-		Smart:            false,
-		SttProvider:      "groq",
+		Smart:              false,
+		SttProvider:        "local",
+		SttLocalModel:      "base",
+		SttMirrorSource:    "hf-mirror",
+		SttCustomMirrorUrl: "",
+		SttWhisperPath:     "",
 		SttKey:           "",
 		SttBaseUrl:       "",
 		SttModel:         "whisper-large-v3-turbo",
@@ -199,6 +207,9 @@ func (cs *ConfigStore) load() {
 		}
 		if s.Provider == "" {
 			s.Provider = def.Provider
+		}
+		if s.SttMirrorSource == "" {
+			s.SttMirrorSource = def.SttMirrorSource
 		}
 		if s.Opacity <= 0 {
 			s.Opacity = def.Opacity

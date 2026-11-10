@@ -138,7 +138,7 @@
         <div class="response-area" ref="responseBox">
           <div v-if="responseContent" class="markdown-body" v-html="renderedMarkdown"></div>
           <div v-else class="welcome-guide">
-            <h3 class="welcome-title">面试隐形辅助副驾已就绪</h3>
+            <h3 class="welcome-title">面试隐形助手已就绪</h3>
             <p class="welcome-desc">已开启屏幕共享隐形保护，他人无法在共享或录屏中看到此窗口。</p>
             <div class="shortcut-grid">
               <div class="sc-item" @click="triggerFeature('say')">
@@ -389,29 +389,198 @@
           <!-- STT Tab -->
           <div v-show="activeTab === 'stt'" class="tab-pane">
             <div class="form-group">
-              <label>语音识别服务商</label>
+              <label>语音识别引擎 / 服务商</label>
               <select v-model="settings.sttProvider">
-                <option value="groq">Groq Whisper (极速低延迟 - 强烈推荐)</option>
-                <option value="openai">OpenAI Whisper</option>
-                <option value="custom">自定义 STT 端点</option>
+                <optgroup label="本地离线引擎 (推荐 - 零费用/私密)">
+                  <option value="local">本地 Whisper (whisper.cpp - 离线运行)</option>
+                </optgroup>
+                <optgroup label="云端极速服务 (API)">
+                  <option value="groq">Groq Whisper (极速低延迟 - 强烈推荐)</option>
+                  <option value="siliconflow">硅基流动 SiliconFlow (国内免翻直连 / SenseVoice)</option>
+                  <option value="openai">OpenAI Whisper (官方 whisper-1)</option>
+                  <option value="custom">自定义 STT 端点 (兼容 OpenAI 接口)</option>
+                </optgroup>
               </select>
             </div>
 
-            <div class="form-group">
-              <label>STT API Key</label>
-              <input
-                type="password"
-                v-model="settings.sttKey"
-                placeholder="若留空则复用该服务商的 API Key"
-              />
+            <!-- 本地 Whisper 专属配置 -->
+            <div v-if="settings.sttProvider === 'local'" class="local-stt-panel">
+              <div class="form-group">
+                <div class="label-with-badge">
+                  <label>本地 Whisper 模型 (GGML)</label>
+                  <span v-if="currentLocalModelInfo?.downloaded" class="model-badge badge-ready">✓ 已就绪</span>
+                  <span v-else-if="isDownloadingCurrentModel" class="model-badge badge-downloading">⏳ 下载中 {{ downloadProgressText }}</span>
+                  <span v-else class="model-badge badge-missing">⚠ 需下载 ({{ currentLocalModelInfo?.size || '未知' }})</span>
+                </div>
+                <select v-model="settings.sttLocalModel">
+                  <option v-for="m in whisperModels" :key="m.name" :value="m.name">
+                    {{ m.displayName }} [{{ m.size }}] {{ m.downloaded ? '✓ 已就绪' : '— 需下载' }} ({{ m.recommendation || (m.speed >= 4 ? '高速' : '高精') }})
+                  </option>
+                </select>
+                <p class="hint" v-if="currentLocalModelInfo?.description">
+                  💡 {{ currentLocalModelInfo.description }}
+                </p>
+              </div>
+
+              <!-- 模型下载镜像源配置 -->
+              <div class="form-group">
+                <label>模型下载镜像源</label>
+                <select v-model="settings.sttMirrorSource">
+                  <option value="hf-mirror">国内高速镜像 (hf-mirror.com)</option>
+                  <option value="huggingface">HuggingFace 官方源 (huggingface.co)</option>
+                  <option value="custom">自定义镜像源 URL (高级)</option>
+                </select>
+                <div v-if="settings.sttMirrorSource === 'custom'" class="custom-mirror-box" style="margin-top: 8px;">
+                  <input
+                    type="text"
+                    v-model="settings.sttCustomMirrorUrl"
+                    placeholder="输入镜像源根地址，例如: https://my-server.com/whisper-models"
+                  />
+                  <p class="hint">
+                    下载时将自动在末尾拼接文件名: <code>{{ (settings.sttCustomMirrorUrl || 'https://...').replace(/\/+$/, '') }}/{{ currentLocalModelInfo?.filename || 'ggml-base.bin' }}</code>
+                  </p>
+                </div>
+              </div>
+
+              <!-- 模型下载与就绪状态卡片 -->
+              <div class="model-status-card">
+                <!-- 状态 1: 正在下载 -->
+                <div v-if="whisperDownloadState.status === 'downloading'" class="download-progress-box">
+                  <div class="download-info-row">
+                    <span class="downloading-title">
+                      <span class="spinner-small"></span> 正在下载 {{ downloadingModelTitle }}...
+                    </span>
+                    <span class="download-speed-badge">{{ whisperDownloadState.speed || '正在连接...' }}</span>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar-fill" :style="{ width: whisperDownloadState.progress + '%' }"></div>
+                  </div>
+                  <div class="download-meta-row">
+                    <span>{{ formatBytes(whisperDownloadState.downloaded) }} / {{ formatBytes(whisperDownloadState.total) }} ({{ whisperDownloadState.progress.toFixed(1) }}%)</span>
+                    <button type="button" class="btn-cancel-download" @click="cancelModelDownload">取消下载</button>
+                  </div>
+                </div>
+
+                <!-- 状态 2: 下载失败 -->
+                <div v-else-if="whisperDownloadState.status === 'failed' && whisperDownloadState.model === (settings.sttLocalModel || 'base')" class="download-error-box">
+                  <div class="error-msg-row">
+                    <span>⚠️ 下载失败: {{ whisperDownloadState.error }}</span>
+                  </div>
+                  <button type="button" class="btn-download-action" @click="startDownloadCurrentModel">重新下载</button>
+                </div>
+
+                <!-- 状态 3: 模型未下载，提示下载 -->
+                <div v-else-if="!currentLocalModelInfo?.downloaded" class="download-prompt-box">
+                  <div class="prompt-text">
+                    <span class="prompt-icon">📦</span>
+                    <div class="prompt-desc">
+                      <strong>需要下载该模型后方可使用</strong>
+                      <p>模型文件 <code>{{ currentLocalModelInfo?.filename || 'ggml-model.bin' }}</code> 尚未下载（大小约 {{ currentLocalModelInfo?.size }}）。点击下方按钮即可一键下载到本地。</p>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-download-action" @click="startDownloadCurrentModel">
+                    ⬇️ 立即下载该模型 ({{ currentLocalModelInfo?.size }})
+                  </button>
+                </div>
+
+                <!-- 状态 4: 模型已就绪 -->
+                <div v-else class="download-ready-box">
+                  <div class="ready-info">
+                    <span class="ready-icon">✓</span>
+                    <div>
+                      <strong>本地模型已就绪</strong>
+                      <p>模型文件 <code>{{ currentLocalModelInfo?.filename }}</code> 存储于本地，转录将完全离线运行。</p>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-text-danger" title="删除本地模型文件以释放空间" @click="deleteCurrentModel">删除模型</button>
+                </div>
+              </div>
+
+              <!-- Whisper CLI Runtime 运行环境检测与指引 -->
+              <div class="runtime-status-box">
+                <div class="runtime-header" @click="showRuntimeConfig = !showRuntimeConfig">
+                  <div class="runtime-indicator">
+                    <span class="status-dot" :class="whisperRuntime.available ? 'dot-green' : 'dot-yellow'"></span>
+                    <span v-if="whisperRuntime.available" class="runtime-ok">本地 Whisper 运行时就绪</span>
+                    <span v-else class="runtime-warn">未检测到 whisper-cli 执行文件</span>
+                  </div>
+                  <button type="button" class="btn-toggle-config">
+                    {{ showRuntimeConfig ? '收起配置 ▲' : '配置与说明 ▼' }}
+                  </button>
+                </div>
+
+                <div v-show="showRuntimeConfig" class="runtime-detail">
+                  <div class="form-group" style="margin-bottom: 8px;">
+                    <label>whisper-cli 可执行文件路径 (留空则自动检测)</label>
+                    <div class="input-with-button">
+                      <input
+                        type="text"
+                        v-model="settings.sttWhisperPath"
+                        placeholder="例如: D:\whisper.cpp\build\bin\Release\whisper-cli.exe"
+                      />
+                      <button type="button" class="btn-sm-secondary" @click="detectRuntime">检测环境</button>
+                    </div>
+                  </div>
+                  <p class="hint" v-if="whisperRuntime.available">
+                    ✓ 当前使用路径: <code>{{ whisperRuntime.path }}</code>
+                  </p>
+                  <p class="hint" v-else>
+                    💡 提示：本地转录需配合 <code>whisper-cli.exe</code> 运行。您可以从 <a href="https://github.com/ggerganov/whisper.cpp/releases" target="_blank" style="color: #60a5fa; text-decoration: underline;">whisper.cpp Release</a> 下载 Windows 预编译压缩包，将 <code>whisper-cli.exe</code> 放入本程序 <code>bin/</code> 目录，或在此处填入其完整路径。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 云端 STT 专属配置 -->
+            <div v-else class="cloud-stt-panel">
+              <div class="form-group" v-if="settings.sttProvider === 'siliconflow'">
+                <label>硅基流动 STT 模型</label>
+                <select v-model="settings.sttModel">
+                  <option value="FunAudioLLM/SenseVoiceSmall">FunAudioLLM/SenseVoiceSmall (阿里开源 - 极速精准 - 推荐)</option>
+                  <option value="Tele-AI/TeleSpeech-ASR">Tele-AI/TeleSpeech-ASR (电信开源)</option>
+                  <option value="openai/whisper-large-v3">openai/whisper-large-v3 (云端大模型)</option>
+                </select>
+                <p class="hint">国内免翻墙高速直连，SenseVoice 转录延迟低至 100ms 左右。</p>
+              </div>
+
+              <div class="form-group" v-if="settings.sttProvider === 'custom'">
+                <label>自定义 STT Base URL</label>
+                <input
+                  type="text"
+                  v-model="settings.sttBaseUrl"
+                  placeholder="例如: https://api.your-domain.com/v1"
+                />
+                <p class="hint">支持任意符合 OpenAI <code>/audio/transcriptions</code> 规范的 API 端点。</p>
+              </div>
+
+              <div class="form-group" v-if="settings.sttProvider === 'custom'">
+                <label>自定义 STT 模型名称</label>
+                <input
+                  type="text"
+                  v-model="settings.sttModel"
+                  placeholder="例如: whisper-1 或 whisper-large-v3"
+                />
+              </div>
+
+              <div class="form-group">
+                <label>STT API Key</label>
+                <input
+                  type="password"
+                  v-model="settings.sttKey"
+                  :placeholder="sttKeyPlaceholder"
+                />
+                <p class="hint">若留空，将自动复用大模型配置中对应服务商的 API Key。</p>
+              </div>
             </div>
 
             <div class="form-group">
-              <label>识别语言</label>
+              <label>音频转录语言</label>
               <select v-model="settings.sttLanguage">
-                <option value="zh">中文 (zh)</option>
+                <option value="zh">中文 (zh - 推荐面试使用)</option>
                 <option value="en">英文 (en)</option>
                 <option value="auto">自动识别 (auto)</option>
+                <option value="ja">日语 (ja)</option>
+                <option value="ko">韩语 (ko)</option>
               </select>
             </div>
 
@@ -724,7 +893,13 @@ const settings = ref({
   apiKeys: { ...defaultApiKeys },
   models: { ...defaultModels },
   smart: false,
-  sttProvider: 'groq',
+  sttProvider: 'local',
+  sttLocalModel: 'base',
+  sttMirrorSource: 'hf-mirror',
+  sttCustomMirrorUrl: '',
+  sttWhisperPath: '',
+  sttModel: 'whisper-large-v3-turbo',
+  sttBaseUrl: '',
   sttKey: '',
   sttLanguage: 'zh',
   meetingAudio: true,
@@ -855,6 +1030,159 @@ const detectedCategoryLabel = computed(() => {
   return map[detectedCategory.value] || ''
 })
 
+// Whisper Models & STT State
+const whisperModels = ref([])
+const whisperDownloadState = ref({
+  model: '',
+  status: 'idle',
+  downloaded: 0,
+  total: 0,
+  progress: 0,
+  speed: '',
+  error: ''
+})
+const whisperRuntime = ref({
+  available: false,
+  path: '',
+  version: '',
+  error: ''
+})
+const showRuntimeConfig = ref(false)
+let downloadPollTimer = null
+
+const currentLocalModelInfo = computed(() => {
+  const name = settings.value.sttLocalModel || 'base'
+  return whisperModels.value.find(m => m.name === name) || null
+})
+
+const isDownloadingCurrentModel = computed(() => {
+  const current = settings.value.sttLocalModel || 'base'
+  return whisperDownloadState.value.status === 'downloading' && whisperDownloadState.value.model === current
+})
+
+const downloadProgressText = computed(() => {
+  return `${(whisperDownloadState.value.progress || 0).toFixed(0)}%`
+})
+
+const downloadingModelTitle = computed(() => {
+  const m = whisperModels.value.find(x => x.name === whisperDownloadState.value.model)
+  return m ? m.displayName : (whisperDownloadState.value.model || '模型')
+})
+
+const sttKeyPlaceholder = computed(() => {
+  if (settings.value.sttProvider === 'siliconflow') {
+    return settings.value.apiKeys?.siliconflow ? '已配置 (留空复用硅基流动 Key)' : '输入 SiliconFlow API Key'
+  }
+  if (settings.value.sttProvider === 'groq') {
+    return settings.value.apiKeys?.groq ? '已配置 (留空复用 Groq Key)' : '输入 Groq API Key'
+  }
+  if (settings.value.sttProvider === 'openai') {
+    return settings.value.apiKeys?.openai ? '已配置 (留空复用 OpenAI Key)' : '输入 OpenAI API Key'
+  }
+  return '输入对应的 STT API Key'
+})
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+}
+
+async function loadWhisperModels() {
+  try {
+    const list = await AppService.GetWhisperModels()
+    if (list && list.length) {
+      whisperModels.value = list
+    }
+  } catch (err) {
+    console.error('Failed to load whisper models:', err)
+  }
+}
+
+async function detectRuntime() {
+  try {
+    const res = await AppService.CheckWhisperRuntime()
+    if (res) {
+      whisperRuntime.value = res
+    }
+  } catch (err) {
+    whisperRuntime.value = { available: false, error: err.message }
+  }
+}
+
+async function startDownloadCurrentModel() {
+  const name = settings.value.sttLocalModel || 'base'
+  try {
+    // 确保当前选中的镜像源等配置已保存
+    try {
+      await AppService.SaveSettings(settings.value)
+    } catch (saveErr) {
+      console.warn('Auto-save before download warning:', saveErr)
+    }
+    whisperDownloadState.value = {
+      model: name,
+      status: 'downloading',
+      downloaded: 0,
+      total: currentLocalModelInfo.value?.sizeBytes || 0,
+      progress: 0,
+      speed: '连接中...',
+      error: ''
+    }
+    await AppService.DownloadWhisperModel(name)
+    startDownloadPolling()
+  } catch (err) {
+    whisperDownloadState.value = {
+      model: name,
+      status: 'failed',
+      error: err.message || '启动下载失败'
+    }
+  }
+}
+
+function startDownloadPolling() {
+  if (downloadPollTimer) clearInterval(downloadPollTimer)
+  downloadPollTimer = setInterval(async () => {
+    try {
+      const state = await AppService.GetWhisperModelDownloadState()
+      if (state) {
+        whisperDownloadState.value = state
+        if (state.status === 'completed' || state.status === 'failed' || state.status === 'cancelled') {
+          clearInterval(downloadPollTimer)
+          downloadPollTimer = null
+          await loadWhisperModels()
+        }
+      }
+    } catch (e) {}
+  }, 400)
+}
+
+async function cancelModelDownload() {
+  try {
+    const model = whisperDownloadState.value.model || (settings.value.sttLocalModel || 'base')
+    await AppService.CancelWhisperModelDownload(model)
+    whisperDownloadState.value.status = 'cancelled'
+    if (downloadPollTimer) {
+      clearInterval(downloadPollTimer)
+      downloadPollTimer = null
+    }
+    await loadWhisperModels()
+  } catch (err) {
+    console.error('Cancel download error:', err)
+  }
+}
+
+async function deleteCurrentModel() {
+  const name = settings.value.sttLocalModel || 'base'
+  if (!confirm(`确定要删除本地 Whisper 模型 ${name} 吗？`)) return
+  try {
+    await AppService.DeleteWhisperModel(name)
+    await loadWhisperModels()
+  } catch (err) {
+    alert('删除模型失败: ' + err.message)
+  }
+}
+
 // Methods
 function formatTime(ts) {
   if (!ts) return ''
@@ -878,6 +1206,8 @@ async function loadSettings() {
       for (const [k, v] of Object.entries(defaultModels)) {
         if (!s.models[k]) s.models[k] = { ...v }
       }
+      if (!s.sttMirrorSource) s.sttMirrorSource = 'hf-mirror'
+      if (s.sttCustomMirrorUrl === undefined) s.sttCustomMirrorUrl = ''
       settings.value = s
     }
   } catch (err) {
@@ -898,6 +1228,8 @@ async function loadHistory() {
 
 function openSettings() {
   showSettingsModal.value = true
+  loadWhisperModels()
+  detectRuntime()
 }
 
 async function saveSettings() {
@@ -1131,6 +1463,16 @@ function stopAudioCapture() {
 onMounted(async () => {
   await loadSettings()
   await loadHistory()
+  await loadWhisperModels()
+  detectRuntime()
+
+  Events.On('stt:model_download_progress', (data) => {
+    const payload = data.data || data
+    whisperDownloadState.value = payload
+    if (payload.status === 'completed' || payload.status === 'failed') {
+      loadWhisperModels()
+    }
+  })
 
   // Register Wails Event Listeners
   Events.On('llm:start', (data) => {
@@ -2033,5 +2375,348 @@ onMounted(async () => {
   background: rgba(59, 130, 246, 0.2);
   border-color: var(--accent);
   color: #93c5fd;
+}
+
+/* Local STT & Whisper Models */
+.local-stt-panel,
+.cloud-stt-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.label-with-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.label-with-badge label {
+  margin-bottom: 0;
+}
+
+.model-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.badge-ready {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.badge-missing {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.badge-downloading {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.model-status-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.download-prompt-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prompt-text {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.prompt-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.prompt-desc strong {
+  display: block;
+  font-size: 13px;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+
+.prompt-desc p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.prompt-desc code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  color: #93c5fd;
+}
+
+.btn-download-action {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-download-action:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.download-progress-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #f8fafc;
+}
+
+.download-speed-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+.download-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.btn-cancel-download {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.btn-cancel-download:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.download-error-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.error-msg-row {
+  color: #f87171;
+  font-size: 12px;
+}
+
+.download-ready-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ready-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ready-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.ready-info strong {
+  display: block;
+  font-size: 12.5px;
+  color: #f8fafc;
+}
+
+.ready-info p {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 2px 0 0 0;
+}
+
+.ready-info code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #93c5fd;
+}
+
+.btn-text-danger {
+  background: transparent;
+  color: #f87171;
+  border: none;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.btn-text-danger:hover {
+  color: #ef4444;
+}
+
+.runtime-status-box {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.runtime-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.runtime-indicator {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.dot-green {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.dot-yellow {
+  background: #eab308;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+}
+
+.runtime-ok {
+  color: #4ade80;
+  font-weight: 500;
+}
+
+.runtime-warn {
+  color: #facc15;
+  font-weight: 500;
+}
+
+.btn-toggle-config {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.btn-toggle-config:hover {
+  color: #fff;
+}
+
+.runtime-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-light);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-sm-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

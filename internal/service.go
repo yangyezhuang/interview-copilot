@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -11,28 +13,40 @@ import (
 )
 
 type AppService struct {
-	app          *application.App
-	window       *application.WebviewWindow
-	configStore  *ConfigStore
-	meetingStore *MeetingStore
-	sttClient    *STTClient
-	llmClient    *LLMClient
-	mu           sync.Mutex
-	isBusy       bool
-	cancelStream context.CancelFunc
+	app            *application.App
+	window         *application.WebviewWindow
+	configStore    *ConfigStore
+	meetingStore   *MeetingStore
+	whisperManager *WhisperManager
+	sttClient      *STTClient
+	llmClient      *LLMClient
+	mu             sync.Mutex
+	isBusy         bool
+	cancelStream   context.CancelFunc
 }
 
 func NewAppService(cs *ConfigStore, ms *MeetingStore) *AppService {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = "."
+	}
+	appDir := filepath.Join(configDir, "interview-copilot")
+	wm, _ := NewWhisperManager(appDir)
+
 	return &AppService{
-		configStore:  cs,
-		meetingStore: ms,
-		sttClient:    NewSTTClient(),
-		llmClient:    NewLLMClient(),
+		configStore:    cs,
+		meetingStore:   ms,
+		whisperManager: wm,
+		sttClient:      NewSTTClient(),
+		llmClient:      NewLLMClient(),
 	}
 }
 
 func (s *AppService) SetApp(app *application.App) {
 	s.app = app
+	if s.whisperManager != nil {
+		s.whisperManager.SetApp(app)
+	}
 }
 
 func (s *AppService) SetWindow(w *application.WebviewWindow) {
@@ -89,7 +103,7 @@ func (s *AppService) ProcessAudio(channel string, base64PCM string) (string, err
 	}
 
 	settings := s.configStore.Get()
-	text, err := s.sttClient.Transcribe(wavBytes, settings)
+	text, err := s.sttClient.Transcribe(wavBytes, settings, s.whisperManager)
 	if err != nil {
 		s.app.EmitEvent("stt:error", map[string]string{
 			"channel": channel,
@@ -221,4 +235,55 @@ func (s *AppService) ToggleHide() {
 
 func (s *AppService) QuitApp() {
 	s.app.Quit()
+}
+
+func (s *AppService) GetWhisperModels() []WhisperModelInfo {
+	if s.whisperManager == nil {
+		return nil
+	}
+	return s.whisperManager.GetModels()
+}
+
+func (s *AppService) DownloadWhisperModel(modelName string) error {
+	if s.whisperManager == nil {
+		return fmt.Errorf("本地模型管理器未初始化")
+	}
+	settings := s.configStore.Get()
+	return s.whisperManager.StartDownload(modelName, settings.SttMirrorSource, settings.SttCustomMirrorUrl)
+}
+
+func (s *AppService) CancelWhisperModelDownload(modelName string) error {
+	if s.whisperManager == nil {
+		return fmt.Errorf("本地模型管理器未初始化")
+	}
+	return s.whisperManager.CancelDownload(modelName)
+}
+
+func (s *AppService) DeleteWhisperModel(modelName string) error {
+	if s.whisperManager == nil {
+		return fmt.Errorf("本地模型管理器未初始化")
+	}
+	return s.whisperManager.DeleteModel(modelName)
+}
+
+func (s *AppService) GetWhisperModelDownloadState() WhisperDownloadState {
+	if s.whisperManager == nil {
+		return WhisperDownloadState{Status: "idle"}
+	}
+	return s.whisperManager.GetDownloadState()
+}
+
+func (s *AppService) CheckWhisperRuntime() WhisperRuntimeStatus {
+	if s.whisperManager == nil {
+		return WhisperRuntimeStatus{Available: false, Error: "本地模型管理器未初始化"}
+	}
+	settings := s.configStore.Get()
+	return s.whisperManager.CheckRuntime(settings.SttWhisperPath)
+}
+
+func (s *AppService) GetModelsDirectory() string {
+	if s.whisperManager == nil {
+		return ""
+	}
+	return s.whisperManager.GetModelsDir()
 }

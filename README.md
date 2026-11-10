@@ -1,8 +1,7 @@
-# Interview Copilot (面试辅助副驾驶)
+# Interview Copilot (面试助手)
 
 <div align="center">
-
-**参考致敬 [Blueturboguy07/cue](https://github.com/Blueturboguy07/cue) ，使用 Wails v3 + Go + Vue 3 进行全面重构的轻量级隐形 AI 实时面试副驾。**
+**基于 Wails v3 + Go + Vue 3 进行全面重构的轻量级隐形 AI 实时面试助手。**
 
 浮动在屏幕之上，眼观屏幕、耳听会议，在面试与现场编程中为您实时提示最优解。
 
@@ -62,8 +61,10 @@
 - **Groq**：极速 LPU 推理与 Whisper 语音转录。
 - **自定义 OpenAI 兼容接口**：支持 OneAPI、NewAPI、vLLM、FastChat 等任意兼容端点。
 
-### 6. 🎙️ 毫秒级语音转文字 (STT)
-- **Groq Whisper**：推荐使用，基于 LPU 硬件加速的 `whisper-large-v3-turbo`，转录延迟低至数百毫秒。
+### 6. 🎙️ 本地与云端双模语音转文字 (STT)
+- **本地离线 Whisper (参考 Yap 架构方案)**：基于 `whisper.cpp` 引擎，支持在本地下载与运行多种规格的 GGML 模型（`base` [推荐]、`tiny` [极速]、`small` [高精]、`medium`、`large-v3-turbo` 及英文专用版本）。零网络流量、零费用支出、数据 100% 本地化私密安全；支持设置内一键下载与断点检测。
+- **Groq Whisper**：基于 LPU 硬件加速的 `whisper-large-v3-turbo`，转录延迟低至数百毫秒。
+- **硅基流动 (SiliconFlow)**：免翻墙高速直连，支持 `SenseVoiceSmall` 等高性价比模型。
 - **OpenAI Whisper**：官方 `whisper-1` 高精度语音识别。
 - **自定义 STT**：支持任意兼容 `/v1/audio/transcriptions` 的本地或远程端点。
 
@@ -108,18 +109,6 @@
 
 ```
 interview-copilot/
-├── main.go               # 应用程序入口与 Wails 窗口初始化
-├── service.go            # 暴露给前端的 Wails 核心服务 (AppService)
-├── config.go             # 本地配置存储与管理 (Settings)
-├── screen.go             # 屏幕截图捕获与自适应压缩 (Vision-ready)
-├── wav.go                # 16kHz PCM 音频流包装器
-├── stt.go                # 语音识别客户端 (OpenAI/Groq/Custom Whisper)
-├── llm.go                # 统一多厂商流式大模型客户端 (SSE解析)
-├── prompts.go            # 提示词工程与模式定义 (Assist/Say/LeetCode/Recap等)
-├── context.go            # 面试题型分类判断与个人画像上下文组装
-├── meetings.go           # 会议对话记忆库与本地持久化
-├── window_windows.go     # Windows 原生防录屏隐藏与全局热键
-├── window_other.go       # 跨平台兼容桩函数
 ├── frontend/             # Vue 3 现代化前端界面
 │   ├── src/
 │   │   ├── App.vue       # 主毛玻璃悬浮界面与交互逻辑
@@ -127,6 +116,19 @@ interview-copilot/
 │   ├── public/
 │   │   └── style.css     # 毛玻璃设计样式表
 │   └── package.json
+├── internal/             # 后端核心逻辑
+|	├── service.go            # 暴露给前端的 Wails 核心服务 (AppService)
+|   ├── config.go             # 本地配置存储与管理 (Settings)
+|   ├── screen.go             # 屏幕截图捕获与自适应压缩 (Vision-ready)
+|   ├── wav.go                # 16kHz PCM 音频流包装器
+|   ├── stt.go                # 语音识别客户端 (OpenAI/Groq/Custom Whisper)
+|   ├── llm.go                # 统一多厂商流式大模型客户端 (SSE解析)
+|   ├── prompts.go            # 提示词工程与模式定义 (Assist/Say/LeetCode/Recap等)
+|   ├── context.go            # 面试题型分类判断与个人画像上下文组装
+|   ├── meetings.go           # 会议对话记忆库与本地持久化
+|   ├── window_windows.go     # Windows 原生防录屏隐藏与全局热键
+|   └── window_other.go       # 跨平台兼容桩函数
+├── main.go               # 应用程序入口与 Wails 窗口初始化
 └── README.md             # 中文使用文档
 ```
 
@@ -227,7 +229,6 @@ go build -tags production -trimpath -ldflags="-w -s -H windowsgui" -o bin/interv
 
 ## 🤝 鸣谢与致敬
 
-- [Blueturboguy07/cue](https://github.com/Blueturboguy07/cue) - 原项目的优秀理念与灵感来源。
 - [Wails](https://wails.io/) - 强大优雅的 Go + Web 混合桌面应用开发框架。
 - [Vue.js](https://vuejs.org/) - 简单灵活的前端框架。
 

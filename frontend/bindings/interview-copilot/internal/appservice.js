@@ -15,11 +15,32 @@ import * as application$0 from "../../github.com/wailsapp/wails/v3/pkg/applicati
 import * as $models from "./models.js";
 
 /**
+ * @param {string} modelName
+ * @returns {Promise<void> & { cancel(): void }}
+ */
+export function CancelWhisperModelDownload(modelName) {
+    let $resultPromise = /** @type {any} */($Call.ByID(311073108, modelName));
+    return $resultPromise;
+}
+
+/**
  * @returns {Promise<string> & { cancel(): void }}
  */
 export function CaptureScreen() {
     let $resultPromise = /** @type {any} */($Call.ByID(1939332377));
     return $resultPromise;
+}
+
+/**
+ * @returns {Promise<$models.WhisperRuntimeStatus> & { cancel(): void }}
+ */
+export function CheckWhisperRuntime() {
+    let $resultPromise = /** @type {any} */($Call.ByID(1376525597));
+    let $typingPromise = /** @type {any} */($resultPromise.then(($result) => {
+        return $$createType0($result);
+    }));
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
 }
 
 /**
@@ -31,15 +52,41 @@ export function ClearTranscript() {
 }
 
 /**
+ * @param {string} modelName
+ * @returns {Promise<void> & { cancel(): void }}
+ */
+export function DeleteWhisperModel(modelName) {
+    let $resultPromise = /** @type {any} */($Call.ByID(3558709341, modelName));
+    return $resultPromise;
+}
+
+/**
+ * @param {string} modelName
+ * @returns {Promise<void> & { cancel(): void }}
+ */
+export function DownloadWhisperModel(modelName) {
+    let $resultPromise = /** @type {any} */($Call.ByID(3584589146, modelName));
+    return $resultPromise;
+}
+
+/**
  * @returns {Promise<$models.Turn[]> & { cancel(): void }}
  */
 export function GetMeetingHistory() {
     let $resultPromise = /** @type {any} */($Call.ByID(4291191572));
     let $typingPromise = /** @type {any} */($resultPromise.then(($result) => {
-        return $$createType1($result);
+        return $$createType2($result);
     }));
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
+}
+
+/**
+ * @returns {Promise<string> & { cancel(): void }}
+ */
+export function GetModelsDirectory() {
+    let $resultPromise = /** @type {any} */($Call.ByID(546213492));
+    return $resultPromise;
 }
 
 /**
@@ -48,7 +95,31 @@ export function GetMeetingHistory() {
 export function GetSettings() {
     let $resultPromise = /** @type {any} */($Call.ByID(2834183166));
     let $typingPromise = /** @type {any} */($resultPromise.then(($result) => {
-        return $$createType2($result);
+        return $$createType3($result);
+    }));
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * @returns {Promise<$models.WhisperDownloadState> & { cancel(): void }}
+ */
+export function GetWhisperModelDownloadState() {
+    let $resultPromise = /** @type {any} */($Call.ByID(2691912541));
+    let $typingPromise = /** @type {any} */($resultPromise.then(($result) => {
+        return $$createType4($result);
+    }));
+    $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
+    return $typingPromise;
+}
+
+/**
+ * @returns {Promise<$models.WhisperModelInfo[]> & { cancel(): void }}
+ */
+export function GetWhisperModels() {
+    let $resultPromise = /** @type {any} */($Call.ByID(2251906209));
+    let $typingPromise = /** @type {any} */($resultPromise.then(($result) => {
+        return $$createType6($result);
     }));
     $typingPromise.cancel = $resultPromise.cancel.bind($resultPromise);
     return $typingPromise;
@@ -127,6 +198,10 @@ export function ToggleHide() {
 }
 
 // Private type creation functions
-const $$createType0 = $models.Turn.createFrom;
-const $$createType1 = $Create.Array($$createType0);
-const $$createType2 = $models.Settings.createFrom;
+const $$createType0 = $models.WhisperRuntimeStatus.createFrom;
+const $$createType1 = $models.Turn.createFrom;
+const $$createType2 = $Create.Array($$createType1);
+const $$createType3 = $models.Settings.createFrom;
+const $$createType4 = $models.WhisperDownloadState.createFrom;
+const $$createType5 = $models.WhisperModelInfo.createFrom;
+const $$createType6 = $Create.Array($$createType5);
