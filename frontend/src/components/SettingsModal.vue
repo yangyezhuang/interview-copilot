@@ -1,27 +1,42 @@
 <template>
-  <div class="modal-backdrop clickable" @click.self="$emit('close')">
-    <div class="settings-modal glass-panel">
-      <div class="modal-header">
-        <h2>设置中心</h2>
-        <button class="close-modal-btn" @click="$emit('close')">✕</button>
-      </div>
+  <div class="settings-modal glass-panel clickable">
+    <!-- Left Sidebar Menu -->
+    <aside class="settings-sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">设置</span>
+        </div>
+        <nav class="settings-nav">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="nav-item"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
+          >
+            <span class="nav-icon">{{ tab.icon }}</span>
+            <span class="nav-label">{{ tab.name }}</span>
+          </button>
+        </nav>
+      </aside>
 
-      <!-- Tabs -->
-      <div class="settings-tabs">
-        <button :class="{ active: activeTab === 'llm' }" @click="activeTab = 'llm'">🤖 模型与服务</button>
-        <button :class="{ active: activeTab === 'stt' }" @click="activeTab = 'stt'">🎙️ 语音识别</button>
-        <button :class="{ active: activeTab === 'profile' }" @click="activeTab = 'profile'">👤 面试背景画像</button>
-        <button :class="{ active: activeTab === 'appearance' }" @click="activeTab = 'appearance'">🎨 界面与快捷键</button>
-      </div>
+      <!-- Right Content Area -->
+      <main class="settings-content-wrapper">
+        <div class="content-header">
+          <div class="header-titles">
+            <h3>{{ currentTab.title }}</h3>
+            <p class="header-subtitle">{{ currentTab.desc }}</p>
+          </div>
+          <button class="close-modal-btn" @click="$emit('close')" title="关闭">✕</button>
+        </div>
 
-      <div class="settings-body">
-        <!-- LLM Tab -->
-        <div v-show="activeTab === 'llm'" class="tab-pane">
+        <div class="settings-body">
+          <!-- LLM Tab -->
+          <div v-show="activeTab === 'llm'" class="tab-pane">
           <div class="form-group">
             <label>大模型服务商</label>
             <select v-model="settings.provider">
               <optgroup label="国内大模型">
-                <option value="deepseek">DeepSeek (深度求索 - 官方)</option>
+                <option value="deepseek">DeepSeek (深度求索)</option>
                 <option value="qwen">通义千问 (阿里百炼 DashScope)</option>
                 <option value="doubao">豆包 (字节跳动 火山方舟 Ark)</option>
                 <option value="siliconflow">硅基流动 (SiliconFlow - 极速聚合)</option>
@@ -415,24 +430,232 @@
             </div>
           </div>
         </div>
+
+        <!-- About Tab -->
+        <div v-show="activeTab === 'about'" class="tab-pane about-pane">
+          <div class="about-hero-card">
+            <div class="app-avatar-box">
+              <span class="app-avatar-emoji">🎯</span>
+            </div>
+            <div class="app-identity-info">
+              <div class="identity-title-row">
+                <h4 class="app-name">Interview Copilot</h4>
+                <span class="version-tag">{{ APP_VERSION }}</span>
+              </div>
+              <p class="app-desc">轻量级隐形 AI 实时面试与算法编程辅助系统</p>
+            </div>
+          </div>
+
+          <!-- Version & Update Card -->
+          <div class="about-card">
+            <div class="card-section-title">
+              <span>版本与更新</span>
+            </div>
+
+            <div class="version-update-box">
+              <div class="version-info-row">
+                <div class="version-detail-item">
+                  <span class="detail-label">当前安装版本:</span>
+                  <span class="detail-val font-mono">{{ APP_VERSION }}</span>
+                </div>
+                <div class="version-detail-item">
+                  <span class="detail-label">发布通道:</span>
+                  <span class="detail-val">正式发布版 (Stable)</span>
+                </div>
+              </div>
+
+              <div class="update-action-row">
+                <button
+                  type="button"
+                  class="btn-check-update"
+                  :disabled="isCheckingUpdate"
+                  @click="checkForUpdates"
+                >
+                  <span v-if="isCheckingUpdate" class="spinner-small"></span>
+                  <span>{{ isCheckingUpdate ? '正在检查更新...' : '🔄 检查更新' }}</span>
+                </button>
+                <span v-if="lastCheckTime" class="last-check-hint">上次检查: {{ lastCheckTime }}</span>
+              </div>
+
+              <!-- Update Status Feedback -->
+              <div v-if="updateCheckResult" class="update-result-card" :class="'result-' + updateCheckResult.status">
+                <div v-if="updateCheckResult.status === 'latest'" class="status-content">
+                  <span class="status-icon">✓</span>
+                  <div class="status-text">
+                    <strong>{{ updateCheckResult.message }}</strong>
+                    <p>您已在使用最新版本，享有所有最新面试辅导与隐形功能。</p>
+                  </div>
+                </div>
+
+                <div v-else-if="updateCheckResult.status === 'available'" class="status-content">
+                  <span class="status-icon">🎉</span>
+                  <div class="status-text">
+                    <strong>发现新版本: {{ updateCheckResult.version }}</strong>
+                    <p v-if="updateCheckResult.notes" class="release-note-preview">{{ updateCheckResult.notes }}</p>
+                    <a :href="updateCheckResult.url" target="_blank" class="download-link-btn">
+                      前往 GitHub Releases 下载更新 ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- System & Architecture Specs -->
+          <div class="about-card">
+            <div class="card-section-title">
+              <span>系统与架构特性</span>
+            </div>
+            <div class="specs-grid">
+              <div class="spec-item">
+                <span class="spec-label">核心底层</span>
+                <span class="spec-val">Wails v3 + Go 1.23 + Vue 3</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">屏幕隐形保护</span>
+                <span class="spec-val">Windows DWM SetWindowDisplayAffinity</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">离线语音转录</span>
+                <span class="spec-val">whisper.cpp (GGML 本地引擎)</span>
+              </div>
+              <div class="spec-item">
+                <span class="spec-label">开源协议</span>
+                <span class="spec-val">MIT License</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Open Source Links -->
+          <div class="about-card">
+            <div class="card-section-title">
+              <span>项目与反馈</span>
+            </div>
+            <div class="links-row">
+              <a href="https://github.com/yangyezhuang/interview-copilot" target="_blank" class="external-link">
+                📦 GitHub 开源仓库
+              </a>
+              <a href="https://github.com/yangyezhuang/interview-copilot/issues" target="_blank" class="external-link">
+                💬 提交问题与反馈
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="modal-footer">
         <span v-if="saveMessage" class="save-msg">{{ saveMessage }}</span>
         <button class="save-btn" @click="handleSave">保存配置</button>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettings } from '../composables/useSettings'
 import { useWhisper } from '../composables/useWhisper'
 
 const emit = defineEmits(['close'])
 
 const activeTab = ref('llm')
+
+const APP_VERSION = 'v0.1.0'
+const isCheckingUpdate = ref(false)
+const updateCheckResult = ref(null)
+const lastCheckTime = ref('')
+
+async function checkForUpdates() {
+  if (isCheckingUpdate.value) return
+  isCheckingUpdate.value = true
+  updateCheckResult.value = null
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 4000)
+
+    const res = await fetch('https://api.github.com/repos/yangyezhuang/interview-copilot/releases/latest', {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+
+    const now = new Date()
+    lastCheckTime.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+
+    if (res.ok) {
+      const release = await res.json()
+      if (release && release.tag_name && release.tag_name !== APP_VERSION) {
+        updateCheckResult.value = {
+          status: 'available',
+          version: release.tag_name,
+          url: release.html_url || 'https://github.com/yangyezhuang/interview-copilot/releases',
+          notes: release.body || ''
+        }
+        return
+      }
+    }
+    updateCheckResult.value = {
+      status: 'latest',
+      message: `当前已是最新版本 (${APP_VERSION})`
+    }
+  } catch (e) {
+    const now = new Date()
+    lastCheckTime.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    updateCheckResult.value = {
+      status: 'latest',
+      message: `当前已是最新版本 (${APP_VERSION})`
+    }
+  } finally {
+    isCheckingUpdate.value = false
+  }
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Escape') {
+    emit('close')
+  }
+}
+
+const tabs = [
+  {
+    id: 'llm',
+    name: '模型与服务',
+    icon: '🚀',
+    title: '模型与服务',
+    desc: '配置主流大语言模型 API 密钥、接口端点与高低配模型选型'
+  },
+  {
+    id: 'stt',
+    name: '语音识别',
+    icon: '🎙️',
+    title: '语音识别 (STT)',
+    desc: '配置本地离线 Whisper 引擎或云端极速语音识别转录服务'
+  },
+  {
+    id: 'profile',
+    name: '面试背景画像',
+    icon: '👤',
+    title: '面试背景画像',
+    desc: '配置个人简历、目标岗位 JD 及行为面试 STAR 经历库'
+  },
+  {
+    id: 'appearance',
+    name: '界面与快捷键',
+    icon: '🎨',
+    title: '界面与快捷键',
+    desc: '调整窗口透明度、防截屏录屏保护与查看全局操作快捷键'
+  },
+  {
+    id: 'about',
+    name: '关于',
+    icon: 'ℹ️',
+    title: '关于 Interview Copilot',
+    desc: '软件版本信息、检查最新更新与系统环境运行说明'
+  }
+]
+
+const currentTab = computed(() => tabs.find(t => t.id === activeTab.value) || tabs[0])
 
 const {
   settings,
@@ -466,6 +689,11 @@ const {
 onMounted(() => {
   loadWhisperModels()
   detectRuntime()
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 
 async function handleSave() {
@@ -479,74 +707,147 @@ async function handleSave() {
 </script>
 
 <style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-
 .settings-modal {
-  width: 90%;
-  max-width: 580px;
-  max-height: 85vh;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  width: 95%;
+  max-width: 740px;
+  height: 560px;
+  max-height: calc(100vh - 30px);
   border-radius: var(--radius-lg);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-highlight);
 }
 
-.modal-header {
-  padding: 14px 18px;
+/* Left Sidebar Menu */
+.settings-sidebar {
+  width: 190px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border-right: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 4px 8px 14px 8px;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--border-light);
-}
-.modal-header h2 {
-  font-size: 16px;
-  color: #fff;
-}
-.close-modal-btn {
-  border: none;
+  gap: 10px;
+  padding: 8px 12px;
   background: transparent;
-  color: var(--text-muted);
-  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
   cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
-.close-modal-btn:hover {
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
 
-.settings-tabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid var(--border-light);
-  overflow-x: auto;
-}
-.settings-tabs button {
-  flex: 1;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 12.5px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-}
-.settings-tabs button.active {
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  border-bottom-color: var(--accent);
   font-weight: 500;
 }
 
+.nav-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.nav-label {
+  font-size: 13px;
+}
+
+/* Right Content Area */
+.settings-content-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: transparent;
+}
+
+.content-header {
+  padding: 18px 24px 12px 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.header-titles h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 5px 0;
+  letter-spacing: -0.2px;
+}
+
+.header-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.close-modal-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.close-modal-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 .settings-body {
-  padding: 16px 18px;
+  padding: 8px 24px 18px 24px;
   overflow-y: auto;
   flex: 1;
 }
@@ -607,6 +908,7 @@ async function handleSave() {
 }
 .flex-1 {
   flex: 1;
+  min-width: 0;
 }
 
 .checkbox-group label {
@@ -624,12 +926,13 @@ async function handleSave() {
 }
 
 .modal-footer {
-  padding: 12px 18px;
+  padding: 12px 22px;
   border-top: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  flex-shrink: 0;
 }
 .save-msg {
   font-size: 12px;
@@ -1034,5 +1337,241 @@ async function handleSave() {
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* About Tab Styling */
+.about-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.about-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.app-avatar-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  flex-shrink: 0;
+}
+
+.app-identity-info {
+  flex: 1;
+}
+
+.identity-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.version-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.app-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 3px 0 0 0;
+}
+
+.about-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.card-section-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-bottom: 10px;
+}
+
+.version-update-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.version-info-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.version-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.detail-label {
+  color: var(--text-muted);
+}
+
+.detail-val {
+  color: #fff;
+}
+
+.update-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-check-update {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-light);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-check-update:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: var(--accent);
+  color: #93c5fd;
+}
+
+.btn-check-update:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.last-check-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.update-result-card {
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 4px;
+}
+
+.result-latest {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.result-available {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.status-icon {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.status-text strong {
+  display: block;
+  font-size: 12.5px;
+  color: #f8fafc;
+  margin-bottom: 2px;
+}
+
+.status-text p {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.download-link-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 11.5px;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.download-link-btn:hover {
+  background: var(--accent-hover);
+}
+
+.specs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 14px;
+}
+
+.spec-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spec-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.spec-val {
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.links-row {
+  display: flex;
+  gap: 14px;
+}
+
+.external-link {
+  font-size: 12px;
+  color: #60a5fa;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.external-link:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }
 </style>
